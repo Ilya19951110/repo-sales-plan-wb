@@ -1,0 +1,55 @@
+name: query to balances and sales funnel
+
+
+on:
+    schedule:
+        - cron: '0 3 * * *'
+    workflow_dispatch:
+
+
+jobs:
+  stocks-job:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Debug - Workflow started
+        run: echo "Workflow started at $(date)"
+
+      - name: Install Dependencies 
+        run: pip install -r requirements.txt
+
+      - name:  Decode Google Service Account Key (from base64)
+        run: echo "${{ secrets.GOOGLE_SHEETS }}" | base64 -d > key.json
+              
+      - name: Run Stocks
+        run: python scripts\get_stocks.py
+
+  sales-job:
+     runs-on: ubuntu-latest
+     steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+    
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Debug - Workflow started
+        run: echo "Workflow started at $(date)"
+
+      - name: Install Dependencies 
+        run: pip install -r requirements.txt
+
+      - name:  Decode Google Service Account Key (from base64)
+        run: echo "${{ secrets.GOOGLE_SHEETS }}" | base64 -d > key.json
+              
+      - name: Run Sales
+        run: python scripts\get_sales.py
