@@ -9,6 +9,7 @@ on:
 jobs:
   advert-and-sales:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -18,19 +19,23 @@ jobs:
         with:
           python-version: '3.10'
 
-      - name: Install Dependencies 
+      - name: Install Dependencies
         run: pip install -r requirements.txt
+
+      - name: Set PYTHONPATH
+        run: echo "PYTHONPATH=${{ github.workspace }}" >> $GITHUB_ENV
 
       - name: Decode Google Service Account Key
         run: echo "${{ secrets.GOOGLE_SHEETS }}" | base64 --decode > key.json
 
       - name: Run get_sales
-        run: python scripts/get_sales.py
+        run: python -m scripts.get_sales
         continue-on-error: true
 
       - name: Run get_advert
-        run: python scripts/get_advert.py
+        run: python -m scripts.get_advert
         continue-on-error: true
 
       - name: Cleanup key file
-        run: rm key.json
+        if: always()
+        run: rm -f key.json
