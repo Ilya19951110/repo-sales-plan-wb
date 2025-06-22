@@ -2,7 +2,7 @@ from datetime import datetime, timedelta, date
 
 
 def get_date_range_for_export(today=None):
-    today = today or date(2025, 6, 19)
+    today = today or datetime.today()
 
     weekday = today.weekday()
 
@@ -18,9 +18,6 @@ def get_date_range_for_export(today=None):
         raise ValueError("⛔ Скрипт нужно запускать только в ПН или ЧТ")
 
     return start_date, end_date
-
-
-print(get_date_range_for_export())
 
 
 def split_period(start_date: str, end_date: str, chunk_days: int = 31) -> list[tuple[str, str]]:

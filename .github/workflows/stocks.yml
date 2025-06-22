@@ -2,7 +2,7 @@ name: Run stocks
 
 on:
     schedule:
-        - cron: '0 3 * * *'
+        - cron: '0 1 * * *'
     workflow_dispatch:
 
 
@@ -27,4 +27,5 @@ jobs:
       - name: Run get_stocks
         run: python scripts/get_stocks.py
 
-      
+      - name: Cleanup key file
+        run: rm key.json
