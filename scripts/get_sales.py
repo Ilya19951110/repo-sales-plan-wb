@@ -2,17 +2,25 @@
 import pandas as pd
 from datetime import datetime, timedelta
 import requests
-from scripts.google_sh import get_api_key, save_in_gsh
+from scripts.google_sh import get_api_in_master_table, save_in_gsh
 from time import sleep
+import time
+import tracemalloc
+from scripts.date_export import get_date_range_for_export
 
 
-def get_report_detail_sales(api):
-    stop = 21
-    page = 1
+def get_report_detail_sales(api, name):
     url = 'https://seller-analytics-api.wildberries.ru/api/v2/nm-report/detail'
     all_data = []
+    stop = 21
+    page = 1
+
+    begin_date, end_date = get_date_range_for_export()
+    begin_date = begin_date.strftime("%Y-%m-%d 00:00:00")
+    end_date = end_date.strftime("%Y-%m-%d 23:59:59")
 
     while True:
+
         headers = {
             'Authorization': api,
             'Content-Type': 'application/json',
@@ -23,8 +31,8 @@ def get_report_detail_sales(api):
             'timezone': 'Europe/Moscow',
             'period': {
 
-                'begin': (datetime.now() - timedelta(days=2)).strftime('%Y-%m-%d 00:00:00'),
-                'end': (datetime.now()-timedelta(days=1)).strftime('%Y-%m-%d 23:59:59')
+                'begin': begin_date,
+                'end': end_date
             },
             'orderBy': {
                 'field': 'openCard',
@@ -32,31 +40,37 @@ def get_report_detail_sales(api):
             },
             'page': page
         }
-
+        print(f'Подключаюсь к кабинету: {name}')
         requests_report = requests.post(url, headers=headers, json=params)
+
+        if requests_report.status_code != 200:
+            print(f"❌ Ошибка API: {requests_report.status_code}")
+            print(requests_report.text)
+            break
 
         result = requests_report.json()
 
         cards = result.get('data', {}).get('cards', [])
+
         if not cards:
             break
 
         all_data.extend(cards)
-        page += 1
+
         print(
-            f'Получено {len(cards)} записей кабинета. Всего: {len(all_data)}')
+            f"\033[92mПолучено {len(cards)} записей кабинета. Всего: {len(all_data)}\033[0m")
 
         if len(cards) < 1_000:
             break
-
-        print(f'Спим {stop} сек')
+        page += 1
+        print(f"⏱ Спим {stop} сек...")
 
         sleep(stop)
 
     return all_data
 
 
-def funck(salles):
+def get_current_week_sales_df(sales):
 
     def read_to_json(data, parent_key='', sep='_'):
         items = []
@@ -70,7 +84,7 @@ def funck(salles):
 
         return dict(items)
 
-    data = [read_to_json(item) for item in salles]
+    data = [read_to_json(item) for item in sales]
     df = pd.DataFrame(data)
 
     assert isinstance(df, pd.DataFrame), "Входной df должен быть DataFrame"
@@ -115,7 +129,31 @@ def funck(salles):
 
 
 if __name__ == '__main__':
-    api, date = get_api_key()
-    data_json = get_report_detail_sales(api=api)
-    df = funck(data_json)
-    save_in_gsh(df=df, sheet_name='Аналитика (api)')
+    tracemalloc.start()
+    begin = time.time()
+    cabinet = {}
+
+    for name, (api, _) in get_api_in_master_table().items():
+        try:
+            print(f"🔄 Обработка: {name}")
+            data_json = get_report_detail_sales(api=api, name=name)
+            cabinet[name] = get_current_week_sales_df(data_json)
+
+        except Exception as e:
+            print(f"❌ Ошибка при обработке {name}: {e}")
+
+    save_in_gsh(cabinet=cabinet, sheet_name='Аналитика (api)')
+    end = time.time()
+
+    print(f"Время выполнения get_sales: {(end-begin)/60:,.2f}")
+
+    snapshot = tracemalloc.take_snapshot()
+    top_stats = snapshot.statistics('lineno')
+
+    current, peak = tracemalloc.get_traced_memory()
+    print(
+        f"🔍 Память сейчас: {current / 10**6:.2f} MB; Пик: {peak / 10**6:.2f} MB")
+
+    print("[ТОП по памяти:]")
+    for stat in top_stats[:5]:
+        print(stat)

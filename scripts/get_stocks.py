@@ -1,9 +1,9 @@
 import requests
 import pandas as pd
-from scripts.google_sh import get_api_key, save_in_gsh
+from scripts.google_sh import save_in_gsh, get_api_in_master_table
 
 
-def get_supplier__stocks(api, date):
+def get_supplier_stocks(api, date, name):
     url = "https://statistics-api.wildberries.ru/api/v1/supplier/stocks"
 
     headers = {"Authorization": api}
@@ -14,7 +14,7 @@ def get_supplier__stocks(api, date):
 
     data_stocks = pd.DataFrame()
     try:
-        print(f"🚀🚀  Начинаю запрос ОСТАТКОВ ")
+        print(f"🚀🚀  Начинаю запрос ОСТАТКОВ к {name} ")
 
         res = requests.get(url, params=params, headers=headers)
 
@@ -24,7 +24,7 @@ def get_supplier__stocks(api, date):
         stocks = res.json()
 
         if not stocks:
-            print(f"⚠️ Пустой ответ от API\n{url}")
+            print(f"⚠️ Пустой ответ от API, кабинет {name}\n{url}")
 
         data_stocks = pd.DataFrame(stocks)
 
@@ -54,13 +54,15 @@ def get_supplier__stocks(api, date):
         data_stocks['Размер'] = data_stocks['Размер'].astype(str)
 
     except Exception as e:
-        print(f"❌❌  Произошла ошибка при вызове: {e}")
+        print(f"❌❌  Произошла ошибка кабинета {name} при вызове: {e}")
     return data_stocks
 
 
 if __name__ == '__main__':
+    cabinet = {}
 
-    api_key, date = get_api_key()
-    stocks_df = get_supplier__stocks(api=api_key, date=date)
+    for name, (api, date) in get_api_in_master_table().items():
+        cabinet[name] = get_supplier_stocks(name=name, api=api, date=date)
 
-    save_in_gsh(df=stocks_df, sheet_name='Остатки (api)')
+    # promo_count(api=api)
+    save_in_gsh(cabinet=cabinet, sheet_name='Остатки (api)')

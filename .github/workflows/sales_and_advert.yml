@@ -1,0 +1,36 @@
+name: Run Sales and Advert
+
+on:
+  schedule:
+    - cron: '0 22 * * 0'  # Воскресенье 22:00 UTC (Понедельник 01:00 МСК)
+    - cron: '0 22 * * 3'  # Среда 22:00 UTC (Четверг 01:00 МСК)
+  workflow_dispatch:
+
+jobs:
+  advert-and-sales:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install Dependencies 
+        run: pip install -r requirements.txt
+
+      - name: Decode Google Service Account Key
+        run: echo "${{ secrets.GOOGLE_SHEETS }}" | base64 --decode > key.json
+
+      - name: Run get_sales
+        run: python scripts/get_sales.py
+        continue-on-error: true
+
+      - name: Run get_advert
+        run: python scripts/get_advert.py
+        continue-on-error: true
+
+      - name: Cleanup key file
+        run: rm key.json
