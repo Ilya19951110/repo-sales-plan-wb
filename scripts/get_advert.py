@@ -1,11 +1,11 @@
 
 import numpy as np
-from datetime import datetime, timedelta
+
 import pandas as pd
 import requests
 from scripts.google_sh import get_api_in_master_table, save_in_gsh
-from time import sleep
 from scripts.date_export import get_date_range_for_export
+from scripts.parse_cabinet import parse_args
 
 
 def get_fullstats_advert(name, api):
@@ -35,40 +35,31 @@ def get_fullstats_advert(name, api):
 
     print(f"Длина advertID для кабинета {name} = {len(advertID)}")
 
-    all_stats, chunk = [], 100
-    for i in range(0, len(advertID), chunk):
-        advertID_chank = advertID[i:i+chunk]
+    params = [{'id': c, 'interval': {'begin': start_date, 'end': end_date}}
+              for c in advertID]
+    all_stats = []
+    try:
+        print(
+            f'Начинаю fullstats запрос к {name} для получения статистикки рк.\nДата отчетного периода: {start_date}\nдата конца периода: {end_date}')
 
-        params = [{'id': c, 'interval': {'begin': start_date, 'end': end_date}}
-                  for c in advertID_chank]
+        response = requests.post(url2, headers=headers, json=params)
 
-        try:
+        if response .status_code == 400 and "no companies with correct intervals" in response .text:
             print(
-                f'Начинаю fullstats запрос к {name} для получения статистикки рк.\nДата отчетного периода: {start_date}\nдата конца периода: {end_date}')
+                f"\033[91m ⚠️ Нет данных по кампаниям в интервале ({start_date} — {end_date}) для {name}. Пропускаем.\033[0m")
 
-            response = requests.post(url2, headers=headers, json=params)
-
-            if response .status_code == 400 and "no companies with correct intervals" in response .text:
-                print(
-                    f"\033[91m ⚠️ Нет данных по кампаниям в интервале ({start_date} — {end_date}) для {name}. Пропускаем.\033[0m")
-                continue
-
-            if response .status_code != 200:
-                print(
-                    f"\033[91m❌ Ошибка {response .status_code}: {response .text}\033[0m")
-                continue
-
-            full_stats = response .json()
-
-            print(f"✅ Получено {len(full_stats)} записей")
-            all_stats.extend(full_stats)
-
-            print('спим 60 сек')
-            sleep(60)
-
-        except Exception as e:
+        if response .status_code != 200:
             print(
-                f"\033[91m🚨 Ошибка при запросе к fullstats для {name}: {e}\033[0m")
+                f"\033[91m❌ Ошибка {response .status_code}: {response .text}\033[0m")
+
+        full_stats = response .json()
+
+        print(f"✅ Получено {len(full_stats)} записей")
+        all_stats.extend(full_stats)
+
+    except Exception as e:
+        print(
+            f"\033[91m🚨 Ошибка при запросе к fullstats для {name}: {e}\033[0m")
 
     top_level_campaign_metrics_df = pd.DataFrame([{
         'advertId': campaign.get('advertId'),
@@ -173,14 +164,33 @@ def get_fullstats_advert(name, api):
     })
 
     print(f'Данные преобразованы! Кабинет: {name}')
-    return group_df.sort_values(['Дата', 'Расходы,₽'], ascending=False)
+    return group_df
 
 
 if __name__ == '__main__':
+    # запус с конкретным аргументом
+    # python -m scripts.get_advert --cabinet "План продаж ИП Шелудько (лето)"
+    # без аргумента
+    # python -m scripts.get_advert
+    args = parse_args()
+    selected = args.cabinet
+
+    all_cabinets = get_api_in_master_table()
+
     cabinet = {}
 
-    for name, (api, _) in get_api_in_master_table().items():
-        cabinet[name] = get_fullstats_advert(
-            name=name, api=api)
+    if selected:
+        if selected in all_cabinets:
+            api, _ = all_cabinets[selected]
+            cabinet[selected] = get_fullstats_advert(name=selected, api=api)
+            print(f"📌 Обработка только кабинета: {selected}")
+
+        else:
+            print(f"❌ Кабинет '{selected}' не найден в master-таблице.")
+            exit(1)
+
+    else:
+        for name, (api, _) in all_cabinets.items():
+            cabinet[name] = get_fullstats_advert(name=name, api=api)
 
     save_in_gsh(cabinet=cabinet, sheet_name='РК(api)')
