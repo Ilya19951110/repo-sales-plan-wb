@@ -1,11 +1,9 @@
-
-import numpy as np
-
-import pandas as pd
-import requests
 from scripts.google_sh import get_api_in_master_table, save_in_gsh
 from scripts.date_export import get_date_range_for_export
 from scripts.parse_cabinet import parse_args
+import numpy as np
+import pandas as pd
+import requests
 
 
 def get_fullstats_advert(name, api):

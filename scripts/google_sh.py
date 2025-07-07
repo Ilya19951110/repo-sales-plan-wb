@@ -1,10 +1,10 @@
-import gspread
+import pandas as pd
 from datetime import datetime
 from gspread_dataframe import set_with_dataframe
 from scripts.gspread_client import get_gspread_client
 
 
-def get_api_in_master_table():
+def get_api_in_master_table(sheet_main='MASTERTABLE_План продаж', wsheet_name='Список таблиц') -> dict[str, str]:
     cabinets = {}
     try:
         # Подключаемся к таблице MASTERTABLE_План продаж к листу Списк таблиц
@@ -17,8 +17,8 @@ def get_api_in_master_table():
     try:
         print('📄 Открываю таблицу: MASTERTABLE_План продаж')
 
-        master_sheet_name = gs.open('MASTERTABLE_План продаж')
-        master_worksheet = master_sheet_name.worksheet('Список таблиц')
+        master_sheet_name = gs.open(sheet_main)
+        master_worksheet = master_sheet_name.worksheet(wsheet_name)
         result = master_worksheet.get_all_values()
 
         # Получаем данные, имя таблиц для дальнейшего подключения по кабинетам
@@ -71,7 +71,7 @@ def get_api_in_master_table():
     return cabinets
 
 
-def save_in_gsh(cabinet, sheet_name=None):
+def save_in_gsh(cabinet: dict[str, pd.DataFrame], sheet_name=None) -> None:
 
     gs = get_gspread_client()
 
